@@ -1,35 +1,37 @@
-name: Build QVGrab IPA
+name: Build QVGrab IPA (Fixed)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
-  build-ios:
-    runs-on: macos-latest
+  build:
+    runs-on: macos-14   # ⚠️ 关键：不要 macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+      # ✅ 关键1：降 Ruby版本（解决 encoding bug）
+      - name: Setup Ruby 3.0
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
 
-      # ✅ 修复1：安装 CocoaPods + 正确进入目录
-      - name: Install CocoaPods & Dependencies
+      # ✅ 关键2：安装 CocoaPods稳定版本
+      - name: Install CocoaPods
         run: |
-          sudo gem install cocoapods
+          gem install cocoapods -v 1.15.2
+
+      # ✅ 关键3：Pod install（强制UTF-8）
+      - name: Install Pods
+        run: |
+          export LANG=en_US.UTF-8
+          export LC_ALL=en_US.UTF-8
+
           cd QVGrab
-          pod repo update
-          pod install
+          pod install --repo-update
 
-      # ✅ 修复2：确认 workspace 存在
-      - name: Verify workspace
-        run: |
-          ls -lah QVGrab
-
-      # ✅ 修复3：Build Archive（关键修复点）
+      # ✅ 关键4：Build（免签名）
       - name: Build Archive
         run: |
           cd QVGrab
@@ -40,32 +42,21 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             -archivePath build/QVGrab.xcarchive \
-            CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates
+            CODE_SIGNING_ALLOWED=NO
 
-      # ✅ 修复4：导出 IPA
+      # ✅ 关键5：导出IPA
       - name: Export IPA
         run: |
           cd QVGrab
 
-          mkdir -p build/ipa
-
           cat <<EOF > ExportOptions.plist
           <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN">
           <plist version="1.0">
           <dict>
             <key>method</key>
             <string>development</string>
-
             <key>signingStyle</key>
             <string>automatic</string>
-
-            <key>compileBitcode</key>
-            <false/>
-
-            <key>destination</key>
-            <string>export</string>
           </dict>
           </plist>
           EOF
@@ -75,7 +66,7 @@ jobs:
             -exportPath build/ipa \
             -exportOptionsPlist ExportOptions.plist
 
-      # ✅ 修复5：上传IPA
+      # ✅ 上传
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
