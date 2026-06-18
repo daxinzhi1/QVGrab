@@ -23,22 +23,28 @@ jobs:
         run: |
           sudo gem install cocoapods -v 1.15.2
 
+      # 🔥 FIX 1：必须进入目录
       - name: Install Pods
         run: |
+          cd QVGrab
           export LANG=en_US.UTF-8
           export LC_ALL=en_US.UTF-8
-
           pod install --repo-update
 
-      - name: Find workspace
+      - name: Verify workspace
         run: |
           find . -name "*.xcworkspace"
-          find . -name "*.xcodeproj"
 
+      # 🔥 FIX 2：build也必须在目录内
       - name: Build IPA
         run: |
+          cd QVGrab
+
           WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
           PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
+
+          echo "Workspace: $WORKSPACE"
+          echo "Project: $PROJECT"
 
           if [ -n "$WORKSPACE" ]; then
             xcodebuild archive \
