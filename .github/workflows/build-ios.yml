@@ -1,63 +1,39 @@
-name: Build QVGrab IPA
+- name: Build IPA
+  run: |
+    cd QVGrab || exit 1
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+    echo "=== FULL STRUCTURE ==="
+    find . -maxdepth 5 -name "*.xcworkspace"
+    find . -maxdepth 5 -name "*.xcodeproj"
 
-jobs:
-  build:
-    runs-on: macos-14
+    WORKSPACE=$(find . -maxdepth 5 -name "*.xcworkspace" | head -n 1)
+    PROJECT=$(find . -maxdepth 5 -name "*.xcodeproj" | head -n 1)
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    echo "Workspace: $WORKSPACE"
+    echo "Project: $PROJECT"
 
-      - name: Show structure (debug)
-        run: |
-          pwd
-          ls -lah
-          find . -maxdepth 3 -type f | head -200
+    # ❗ 强制检查
+    if [ -z "$WORKSPACE" ] && [ -z "$PROJECT" ]; then
+      echo "❌ ERROR: No Xcode project found"
+      exit 1
+    fi
 
-      - name: Install CocoaPods
-        run: |
-          sudo gem install cocoapods -v 1.15.2
+    if [ -n "$WORKSPACE" ]; then
+      echo "Using workspace build"
 
-      # 🔥 FIX 1：必须进入目录
-      - name: Install Pods
-        run: |
-          cd QVGrab
-          export LANG=en_US.UTF-8
-          export LC_ALL=en_US.UTF-8
-          pod install --repo-update
+      xcodebuild archive \
+        -workspace "$WORKSPACE" \
+        -scheme QVGrab \
+        -sdk iphoneos \
+        CODE_SIGNING_ALLOWED=NO \
+        -archivePath build/app.xcarchive
+    else
+      echo "Using project build"
 
-      - name: Verify workspace
-        run: |
-          find . -name "*.xcworkspace"
-
-      # 🔥 FIX 2：build也必须在目录内
-      - name: Build IPA
-        run: |
-          cd QVGrab
-
-          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
-          PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
-
-          echo "Workspace: $WORKSPACE"
-          echo "Project: $PROJECT"
-
-          if [ -n "$WORKSPACE" ]; then
-            xcodebuild archive \
-              -workspace "$WORKSPACE" \
-              -scheme QVGrab \
-              -sdk iphoneos \
-              CODE_SIGNING_ALLOWED=NO \
-              -archivePath build/app.xcarchive
-          else
-            xcodebuild archive \
-              -project "$PROJECT" \
-              -scheme QVGrab \
-              -sdk iphoneos \
-              CODE_SIGNING_ALLOWED=NO \
-              -archivePath build/app.xcarchive
-          fi
+      xcodebuild archive \
+        -project "$PROJECT" \
+        -scheme QVGrab \
+        -sdk iphoneos \
+        CODE_SIGNING_ALLOWED=NO \
+        -archivePath build/app.xcarchive
+    fi
