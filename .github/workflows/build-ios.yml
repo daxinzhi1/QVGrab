@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build QVGrab IPA
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-ios:
     runs-on: macos-latest
 
     steps:
@@ -16,31 +16,68 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
 
-      - name: Install CocoaPods (if needed)
+      # ✅ 修复1：安装 CocoaPods + 正确进入目录
+      - name: Install CocoaPods & Dependencies
         run: |
-          sudo gem install cocoapods || true
-          pod install || true
+          sudo gem install cocoapods
+          cd QVGrab
+          pod repo update
+          pod install
 
+      # ✅ 修复2：确认 workspace 存在
+      - name: Verify workspace
+        run: |
+          ls -lah QVGrab
+
+      # ✅ 修复3：Build Archive（关键修复点）
       - name: Build Archive
         run: |
-          xcodebuild \
+          cd QVGrab
+
+          xcodebuild archive \
+            -workspace QVGrab.xcworkspace \
             -scheme QVGrab \
             -sdk iphoneos \
             -configuration Release \
             -archivePath build/QVGrab.xcarchive \
-            archive
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates
 
+      # ✅ 修复4：导出 IPA
       - name: Export IPA
         run: |
+          cd QVGrab
+
           mkdir -p build/ipa
+
+          cat <<EOF > ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+
+            <key>signingStyle</key>
+            <string>automatic</string>
+
+            <key>compileBitcode</key>
+            <false/>
+
+            <key>destination</key>
+            <string>export</string>
+          </dict>
+          </plist>
+          EOF
 
           xcodebuild -exportArchive \
             -archivePath build/QVGrab.xcarchive \
             -exportPath build/ipa \
             -exportOptionsPlist ExportOptions.plist
 
+      # ✅ 修复5：上传IPA
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: QVGrab-IPA
-          path: build/ipa
+          path: QVGrab/build/ipa
