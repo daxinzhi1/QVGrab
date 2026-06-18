@@ -1,74 +1,22 @@
-name: Build QVGrab IPA (Fixed)
+- name: Install Pods
+  run: |
+    cd QVGrab
+    pod install --repo-update
 
-on:
-  workflow_dispatch:
+- name: Debug workspace
+  run: |
+    find . -name "*.xcworkspace"
 
-jobs:
-  build:
-    runs-on: macos-14   # ⚠️ 关键：不要 macos-latest
+- name: Build Archive
+  run: |
+    WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    echo "Using workspace: $WORKSPACE"
 
-      # ✅ 关键1：降 Ruby版本（解决 encoding bug）
-      - name: Setup Ruby 3.0
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.0
-
-      # ✅ 关键2：安装 CocoaPods稳定版本
-      - name: Install CocoaPods
-        run: |
-          gem install cocoapods -v 1.15.2
-
-      # ✅ 关键3：Pod install（强制UTF-8）
-      - name: Install Pods
-        run: |
-          export LANG=en_US.UTF-8
-          export LC_ALL=en_US.UTF-8
-
-          cd QVGrab
-          pod install --repo-update
-
-      # ✅ 关键4：Build（免签名）
-      - name: Build Archive
-        run: |
-          cd QVGrab
-
-          xcodebuild archive \
-            -workspace QVGrab.xcworkspace \
-            -scheme QVGrab \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath build/QVGrab.xcarchive \
-            CODE_SIGNING_ALLOWED=NO
-
-      # ✅ 关键5：导出IPA
-      - name: Export IPA
-        run: |
-          cd QVGrab
-
-          cat <<EOF > ExportOptions.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -exportArchive \
-            -archivePath build/QVGrab.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist ExportOptions.plist
-
-      # ✅ 上传
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: QVGrab-IPA
-          path: QVGrab/build/ipa
+    xcodebuild archive \
+      -workspace "$WORKSPACE" \
+      -scheme QVGrab \
+      -sdk iphoneos \
+      -configuration Release \
+      -archivePath build/QVGrab.xcarchive \
+      CODE_SIGNING_ALLOWED=NO
