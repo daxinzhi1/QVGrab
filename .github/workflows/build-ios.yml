@@ -1,22 +1,36 @@
+- name: Checkout
+  uses: actions/checkout@v4
+
+- name: Show structure (debug)
+  run: |
+    pwd
+    ls -lah
+    find . -maxdepth 3 -type f | head -200
+
 - name: Install Pods
   run: |
-    cd QVGrab
     pod install --repo-update
 
-- name: Debug workspace
+- name: Find workspace or project
   run: |
     find . -name "*.xcworkspace"
+    find . -name "*.xcodeproj"
 
-- name: Build Archive
+- name: Build
   run: |
     WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+    PROJECT=$(find . -name "*.xcodeproj" | head -n 1)
 
-    echo "Using workspace: $WORKSPACE"
-
-    xcodebuild archive \
-      -workspace "$WORKSPACE" \
-      -scheme QVGrab \
-      -sdk iphoneos \
-      -configuration Release \
-      -archivePath build/QVGrab.xcarchive \
-      CODE_SIGNING_ALLOWED=NO
+    if [ -n "$WORKSPACE" ]; then
+      xcodebuild archive \
+        -workspace "$WORKSPACE" \
+        -scheme QVGrab \
+        -sdk iphoneos \
+        CODE_SIGNING_ALLOWED=NO
+    else
+      xcodebuild archive \
+        -project "$PROJECT" \
+        -scheme QVGrab \
+        -sdk iphoneos \
+        CODE_SIGNING_ALLOWED=NO
+    fi
