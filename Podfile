@@ -3,7 +3,7 @@ use_frameworks!
 platform :ios, '12.0'
 
 # =========================
-# 🔥 核心稳定依赖（全部远程）
+# 🔥 核心稳定依赖（远程Pods）
 # =========================
 def pods_core
   pod "GCDWebServer", '3.5.4'
@@ -19,7 +19,7 @@ def pods_core
 end
 
 # =========================
-# 🟡 本地开发模块（保留，但隔离）
+# 🟡 本地模块（保留UI/业务）
 # =========================
 def pods_local
   pod "FileBrowse", :path => './PodsD/FileBrowse'
@@ -34,14 +34,20 @@ target 'QVGrab' do
   pods_local
 end
 
+# =========================
+# 🔥 CI稳定修复（关键）
+# =========================
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
 
-      # 🔥 关键稳定修复（CI必须）
+      # ❌ 禁止签名（CI必须）
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+
+      # 🔥 防止Swift警告干扰CI
+      config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
     end
   end
 end
